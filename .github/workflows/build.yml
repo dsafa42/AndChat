@@ -16,7 +16,11 @@ jobs:
           distribution: temurin
           java-version: 25
 
-      - uses: android-actions/setup-android@v3
+      # 运行器已预装 Android SDK，这里只需接受许可协议，让 AGP 能自动下载 platform 37
+      - name: Accept Android SDK licenses
+        run: |
+          SDKM=$(command -v sdkmanager || ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKM" --licenses > /dev/null || true
 
       - uses: gradle/actions/setup-gradle@v4
 

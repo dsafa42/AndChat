@@ -1,22 +1,11 @@
 package com.chat.aoita.ui.chat
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,8 +18,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,43 +34,43 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.chat.aoita.data.ChatMessage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+data class ChatMessage(val fromUser: Boolean, val text: String)
+
 @Composable
-fun ChatScreen(vm: ChatViewModel) {
+fun ChatScreen() {
+    val messages = remember { mutableStateListOf<ChatMessage>() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var input by rememberSaveable { mutableStateOf("") }
-    var focusTick by remember { mutableIntStateOf(0) }
+    var replying by remember { mutableStateOf<Job?>(null) }
 
-    fun newChat() {
-        vm.newChat()
-        input = ""
-    }
-
-    fun edit(id: Long) {
-        vm.takeForEdit(id)?.let {
-            input = it
-            focusTick++
+    fun send(text: String) {
+        messages += ChatMessage(true, text)
+        messages += ChatMessage(false, "")
+        val idx = messages.lastIndex
+        // 演示用：模拟流式输出。接入真实后端时替换这里。
+        replying = scope.launch {
+            val reply = "这是一条演示回复。把这里换成你自己的模型或接口返回的内容即可。"
+            for (i in 1..reply.length) {
+                messages[idx] = ChatMessage(false, reply.take(i))
+                delay(35)
+            }
+            replying = null
         }
     }
 
@@ -90,7 +79,8 @@ fun ChatScreen(vm: ChatViewModel) {
         drawerContent = {
             ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background) {
                 DrawerContent(onNewChat = {
-                    newChat()
+                    replying?.cancel(); replying = null
+                    messages.clear()
                     scope.launch { drawerState.close() }
                 })
             }
@@ -102,30 +92,17 @@ fun ChatScreen(vm: ChatViewModel) {
                 .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
         ) {
-            TopBar(onMenu = { scope.launch { drawerState.open() } }, onNew = ::newChat)
+            TopBar(
+                onMenu = { scope.launch { drawerState.open() } },
+                onNew = { replying?.cancel(); replying = null; messages.clear() }
+            )
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (vm.messages.isEmpty()) {
-                    Greeting()
-                } else {
-                    MessageList(
-                        messages = vm.messages,
-                        animatedIds = vm.animatedIds,
-                        onRegenerate = vm::regenerate,
-                        onEdit = ::edit,
-                        onFeedback = vm::setFeedback,
-                    )
-                }
+                if (messages.isEmpty()) Greeting() else MessageList(messages)
             }
             InputBar(
-                text = input,
-                onTextChange = { input = it },
-                busy = vm.busy,
-                focusTick = focusTick,
-                onSend = {
-                    vm.send(it)
-                    input = ""
-                },
-                onStop = vm::stop
+                busy = replying != null,
+                onSend = ::send,
+                onStop = { replying?.cancel(); replying = null }
             )
         }
     }
@@ -172,123 +149,54 @@ private fun AccentMark() {
 }
 
 @Composable
-private fun Modifier.enterAnimation(enabled: Boolean): Modifier {
-    val a = remember { Animatable(if (enabled) 0f else 1f) }
-    LaunchedEffect(Unit) {
-        if (enabled) a.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+private fun MessageList(messages: List<ChatMessage>) {
+    val state = rememberLazyListState()
+    LaunchedEffect(messages.size, messages.lastOrNull()?.text?.length) {
+        if (messages.isNotEmpty()) state.animateScrollToItem(messages.lastIndex)
     }
-    return this.graphicsLayer {
-        alpha = a.value
-        translationY = (1f - a.value) * 14.dp.toPx()
+    LazyColumn(
+        state = state,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        items(messages.size) { i ->
+            val m = messages[i]
+            if (m.fromUser) UserBubble(m.text) else AssistantText(m.text)
+        }
     }
 }
 
 @Composable
-private fun MessageList(
-    messages: List<ChatMessage>,
-    animatedIds: MutableSet<Long>,
-    onRegenerate: () -> Unit,
-    onEdit: (Long) -> Unit,
-    onFeedback: (Long, Int) -> Unit,
-) {
-    val state = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    var follow by remember { mutableStateOf(true) }
-    val atBottom by remember { derivedStateOf { !state.canScrollForward } }
-    val bottomIndex = messages.size // 末尾占位项的下标，滚到它即滚到最底
-    val tailLength = messages.lastOrNull()?.text?.length ?: 0
-
-    // 用户向上滑动 → 停止自动跟随；回到底部 → 恢复跟随
-    LaunchedEffect(state) {
-        snapshotFlow { state.isScrollInProgress && state.lastScrolledBackward }
-            .collect { backward -> if (backward) follow = false }
-    }
-    LaunchedEffect(atBottom) { if (atBottom) follow = true }
-    // 新消息：回到跟随状态并滚到底
-    LaunchedEffect(messages.size) {
-        follow = true
-        state.scrollToItem(bottomIndex)
-    }
-    // 流式输出增长时，若处于跟随状态则保持在底部
-    LaunchedEffect(tailLength) {
-        if (follow) state.scrollToItem(bottomIndex)
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = state,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            items(messages, key = { it.id }) { m ->
-                val animate = remember { animatedIds.add(m.id) }
-                Box(Modifier.enterAnimation(animate)) {
-                    if (m.fromUser) {
-                        UserMessage(m.text, onEdit = { onEdit(m.id) })
-                    } else {
-                        AssistantMessage(
-                            message = m,
-                            isLast = m.id == messages.last().id,
-                            onRegenerate = onRegenerate,
-                            onFeedback = { onFeedback(m.id, it) }
-                        )
-                    }
-                }
-            }
-            item(key = "bottom") { Spacer(Modifier.height(1.dp)) }
-        }
-        ScrollToBottomButton(
-            visible = !atBottom && !follow,
-            onClick = {
-                scope.launch {
-                    follow = true
-                    state.animateScrollToItem(bottomIndex)
-                }
-            }
+private fun UserBubble(text: String) {
+    Box(Modifier.fillMaxWidth(), Alignment.CenterEnd) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         )
     }
 }
 
 @Composable
-private fun BoxScope.ScrollToBottomButton(visible: Boolean, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn() + scaleIn(initialScale = 0.8f),
-        exit = fadeOut() + scaleOut(targetScale = 0.8f),
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
-    ) {
-        Surface(
-            color = cs.surface,
-            shape = CircleShape,
-            border = BorderStroke(1.dp, cs.outline),
-            shadowElevation = 4.dp,
-            modifier = Modifier.size(38.dp).clip(CircleShape).clickable(onClick = onClick)
-        ) {
-            Box(Modifier.fillMaxSize(), Alignment.Center) { ArrowDownIcon(cs.onSurface, 18.dp) }
-        }
-    }
+private fun AssistantText(text: String) {
+    // 助手回复不加气泡，直接铺开排版
+    Text(
+        if (text.isEmpty()) "…" else text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+    )
 }
 
 @Composable
-private fun InputBar(
-    text: String,
-    onTextChange: (String) -> Unit,
-    busy: Boolean,
-    focusTick: Int,
-    onSend: (String) -> Unit,
-    onStop: () -> Unit,
-) {
+private fun InputBar(busy: Boolean, onSend: (String) -> Unit, onStop: () -> Unit) {
+    var text by remember { mutableStateOf("") }
     val cs = MaterialTheme.colorScheme
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(focusTick) {
-        if (focusTick > 0) runCatching { focusRequester.requestFocus() }
-    }
-    val canSend = text.isNotBlank()
-    val buttonColor by animateColorAsState(
-        if (busy || canSend) cs.primary else cs.primary.copy(alpha = .35f),
-        label = "sendButton"
-    )
     // 外层负责安全边距：左右留白、避开导航栏和键盘
     Box(
         Modifier
@@ -297,59 +205,55 @@ private fun InputBar(
             .navigationBarsPadding()
             .padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 4.dp)
     ) {
-        Surface(
-            color = cs.surface,
-            shape = RoundedCornerShape(28.dp),
-            border = BorderStroke(1.dp, cs.outline),
-            shadowElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-                BasicTextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    textStyle = MaterialTheme.typography.bodyLarge.merge(TextStyle(color = cs.onSurface)),
-                    cursorBrush = SolidColor(cs.primary),
-                    maxLines = 6,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 6.dp)
-                        .focusRequester(focusRequester),
-                    decorationBox = { inner ->
-                        Box {
-                            if (text.isEmpty()) Text(
-                                "和我聊聊",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = cs.onSurfaceVariant
-                            )
-                            inner()
-                        }
+    Surface(
+        color = cs.surface,
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(1.dp, cs.outline),
+        shadowElevation = 6.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            BasicTextField(
+                value = text,
+                onValueChange = { text = it },
+                textStyle = MaterialTheme.typography.bodyLarge.merge(TextStyle(color = cs.onSurface)),
+                cursorBrush = SolidColor(cs.primary),
+                maxLines = 6,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+                decorationBox = { inner ->
+                    Box {
+                        if (text.isEmpty()) Text(
+                            "和我聊聊",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = cs.onSurfaceVariant
+                        )
+                        inner()
                     }
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(cs.surfaceVariant),
-                        Alignment.Center
-                    ) { PlusIcon(cs.onSurface, 18.dp) }
-                    Spacer(Modifier.weight(1f))
-                    Box(
-                        Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(buttonColor)
-                            .clickable(enabled = busy || canSend) {
-                                if (busy) onStop() else onSend(text.trim())
-                            },
-                        Alignment.Center
-                    ) {
-                        Crossfade(targetState = busy, label = "sendIcon") { b ->
-                            if (b) StopIcon(cs.onPrimary) else ArrowUpIcon(cs.onPrimary)
-                        }
-                    }
+                }
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(cs.surfaceVariant),
+                    Alignment.Center
+                ) { PlusIcon(cs.onSurface, 18.dp) }
+                Spacer(Modifier.weight(1f))
+                val canSend = text.isNotBlank()
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (busy || canSend) cs.primary else cs.primary.copy(alpha = .35f))
+                        .clickable(enabled = busy || canSend) {
+                            if (busy) onStop() else { onSend(text.trim()); text = "" }
+                        },
+                    Alignment.Center
+                ) {
+                    if (busy) StopIcon(cs.onPrimary) else ArrowUpIcon(cs.onPrimary)
                 }
             }
         }
+    }
     }
 }
 

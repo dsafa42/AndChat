@@ -72,13 +72,20 @@ fun UserMessage(text: String, onEdit: () -> Unit) {
                     .combinedClickable(onClick = {}, onLongClick = { menu = true })
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            // 容器色跟随 surface（浅色暖白 / 深色深灰），tonalElevation=0 去掉 Material3 默认的紫调叠加，
+            // 与助手消息长按的白色浮动工具栏保持统一色调。
+            DropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false },
+                containerColor = cs.surface,
+                tonalElevation = 0.dp
+            ) {
                 DropdownMenuItem(
-                    text = { Text("复制") },
+                    text = { Text("复制", color = cs.onSurface) },
                     onClick = { copyToClipboard(context, text); menu = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("编辑并重发") },
+                    text = { Text("编辑并重发", color = cs.onSurface) },
                     onClick = { menu = false; onEdit() }
                 )
             }

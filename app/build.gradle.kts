@@ -40,9 +40,9 @@ android {
     buildTypes {
         release {
             if (ksFile != null) signingConfig = signingConfigs.getByName("release")
+            // 已关闭 R8 代码压缩/优化（release 版曾闪退）
             optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                enable = false
             }
         }
     }

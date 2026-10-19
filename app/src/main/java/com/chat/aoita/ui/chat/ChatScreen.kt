@@ -197,14 +197,22 @@ private fun AssistantText(text: String) {
 private fun InputBar(busy: Boolean, onSend: (String) -> Unit, onStop: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val cs = MaterialTheme.colorScheme
+    // 外层负责安全边距：左右留白、避开导航栏和键盘
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp, top = 4.dp)
+    ) {
     Surface(
         color = cs.surface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(28.dp),
         border = BorderStroke(1.dp, cs.outline),
         shadowElevation = 6.dp,
-        modifier = Modifier.fillMaxWidth().imePadding()
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             BasicTextField(
                 value = text,
                 onValueChange = { text = it },
@@ -245,6 +253,7 @@ private fun InputBar(busy: Boolean, onSend: (String) -> Unit, onStop: () -> Unit
                 }
             }
         }
+    }
     }
 }
 

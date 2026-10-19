@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,9 +36,10 @@ class MainActivity : ComponentActivity() {
         val crash = if (crashFile.exists()) runCatching { crashFile.readText() }.getOrNull() else null
         setContent {
             AoitaTheme {
-                var report by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(crash) }
-                if (report != null) {
-                    CrashScreen(report!!) { crashFile.delete(); report = null }
+                var report by remember { mutableStateOf(crash) }
+                val current = report
+                if (current != null) {
+                    CrashScreen(current) { crashFile.delete(); report = null }
                 } else {
                     ChatScreen()
                 }

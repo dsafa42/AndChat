@@ -1,30 +1,29 @@
 package com.chat.aoita
 
 import android.app.Application
+import android.content.Context
+import android.os.Build
 import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
 
-/** 崩溃时把错误栈写入文件，下次启动由 MainActivity 显示，方便没有电脑时排查。 */
+/** 崩溃时把错误栈写入文件，下次启动由 [com.chat.aoita.ui.CrashScreen] 显示，方便没有电脑时排查。 */
 class AoitaApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-            try {
-                val sw = StringWriter()
-                e.printStackTrace(PrintWriter(sw))
-                File(filesDir, CRASH_FILE).writeText(
-                    "thread: ${thread.name}\nandroid: ${android.os.Build.VERSION.SDK_INT}\n" +
-                        "device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}\n\n$sw"
+            runCatching {
+                crashFile(this).writeText(
+                    "thread: ${thread.name}\n" +
+                        "android: ${Build.VERSION.SDK_INT}\n" +
+                        "device: ${Build.MANUFACTURER} ${Build.MODEL}\n\n" +
+                        e.stackTraceToString()
                 )
-            } catch (_: Throwable) {
             }
             previous?.uncaughtException(thread, e)
         }
     }
 
     companion object {
-        const val CRASH_FILE = "last_crash.txt"
+        fun crashFile(context: Context) = File(context.filesDir, "last_crash.txt")
     }
 }

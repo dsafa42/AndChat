@@ -1,9 +1,11 @@
-package com.chat.aoita.data
+package com.chat.aoita.data.provider
 
+import com.chat.aoita.data.model.ChatMessage
+import javax.inject.Inject
+import kotlin.math.min
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlin.math.min
 
 /**
  * 聊天后端抽象。以后接 Anthropic / OpenAI 时各写一个实现：
@@ -15,11 +17,13 @@ interface ChatProvider {
 }
 
 /** 本地演示实现：不联网，流式吐出一段带 Markdown 的示例回复。 */
-class DemoProvider : ChatProvider {
+class DemoProvider @Inject constructor() : ChatProvider {
     override fun stream(history: List<ChatMessage>): Flow<String> = flow {
-        val last = history.lastOrNull { it.fromUser }?.text.orEmpty()
+        val lastMessage = history.lastOrNull { it.fromUser }
+        val last = lastMessage?.text.orEmpty()
+        val files = lastMessage?.attachments.orEmpty().joinToString("、") { it.name }
         delay(900) // 模拟“思考中”
-        val reply = demoReply(last)
+        val reply = demoReply(last, files)
         var i = 0
         while (i < reply.length) {
             val end = min(i + (2..5).random(), reply.length)
@@ -29,11 +33,11 @@ class DemoProvider : ChatProvider {
         }
     }
 
-    private fun demoReply(question: String) = """
+    private fun demoReply(question: String, files: String) = """
 ## 这是一条演示回复
 
 你刚才说的是：**$question**
-
+${if (files.isEmpty()) "" else "\n（收到附件：$files）\n"}
 下面是支持的 Markdown 效果：
 
 - 行内 `代码`、**加粗**、*斜体*

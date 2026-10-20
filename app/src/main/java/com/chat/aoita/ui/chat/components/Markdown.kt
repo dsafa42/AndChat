@@ -1,9 +1,9 @@
-package com.chat.aoita.ui.chat
+package com.chat.aoita.ui.chat.components
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +54,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.chat.aoita.R
+import com.chat.aoita.ui.common.MIcon
 import kotlinx.coroutines.delay
 
 // ───────────── 解析 ─────────────
@@ -326,7 +329,11 @@ private fun CodeBlock(lang: String, code: String) {
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (copied) CheckIcon(cs.primary, 14.dp) else CopyIcon(cs.onSurfaceVariant, 14.dp)
+                    MIcon(
+                        if (copied) R.drawable.ic_check else R.drawable.ic_content_copy,
+                        if (copied) cs.primary else cs.onSurfaceVariant,
+                        14.dp
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         if (copied) "已复制" else "复制",

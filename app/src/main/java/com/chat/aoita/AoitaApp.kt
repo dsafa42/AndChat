@@ -1,11 +1,13 @@
 package com.chat.aoita
 
 import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 
 /** 崩溃时把错误栈写入文件，下次启动由 MainActivity 显示，方便没有电脑时排查。 */
+@HiltAndroidApp
 class AoitaApp : Application() {
     override fun onCreate() {
         super.onCreate()

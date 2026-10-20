@@ -21,13 +21,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
+import com.chat.aoita.ui.chat.ChatContent
 import com.chat.aoita.ui.chat.ChatScreen
+import com.chat.aoita.ui.chat.ChatUiState
 import com.chat.aoita.ui.theme.AoitaTheme
+import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,5 +78,5 @@ private fun CrashScreen(text: String, onDismiss: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun ChatPreview() {
-    AoitaTheme { ChatScreen() }
+    AoitaTheme { ChatContent(ChatUiState(), onAction = {}) }
 }

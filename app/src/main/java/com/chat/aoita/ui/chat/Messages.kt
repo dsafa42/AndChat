@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalFoundationApi::class)
-
 package com.chat.aoita.ui.chat
 
 import android.content.ClipData
@@ -10,10 +8,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,8 +23,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,14 +47,12 @@ fun copyToClipboard(context: Context, text: String) {
     cm.setPrimaryClip(ClipData.newPlainText("Aoita", text))
 }
 
-/** 用户消息：右侧圆角气泡，长按出菜单（复制 / 编辑并重发）。 */
+/** 用户消息：右侧圆角气泡，文本可选中，用系统浮动工具栏（与助手消息一致）。 */
 @Composable
-fun UserMessage(text: String, onEdit: () -> Unit) {
+fun UserMessage(text: String) {
     val cs = MaterialTheme.colorScheme
-    val context = LocalContext.current
-    var menu by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Box {
+        SelectionContainer {
             Text(
                 text,
                 style = MaterialTheme.typography.bodyLarge,
@@ -69,19 +61,8 @@ fun UserMessage(text: String, onEdit: () -> Unit) {
                     .widthIn(max = 300.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(cs.surfaceVariant)
-                    .combinedClickable(onClick = {}, onLongClick = { menu = true })
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(
-                    text = { Text("复制") },
-                    onClick = { copyToClipboard(context, text); menu = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("编辑并重发") },
-                    onClick = { menu = false; onEdit() }
-                )
-            }
         }
     }
 }

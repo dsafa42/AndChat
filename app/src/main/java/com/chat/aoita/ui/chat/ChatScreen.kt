@@ -1,5 +1,7 @@
 package com.chat.aoita.ui.chat
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
@@ -47,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,10 +58,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.chat.aoita.data.ChatMessage
@@ -78,7 +78,16 @@ fun ChatScreen(provider: ChatProvider = remember { DemoProvider() }) {
     val scope = rememberCoroutineScope()
     var replying by remember { mutableStateOf<Job?>(null) }
     var input by remember { mutableStateOf("") }
-    var focusTick by remember { mutableIntStateOf(0) }
+    var showAttachSheet by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val attachPicker = rememberAttachPicker(
+        onPicked = { uri: Uri ->
+            // TODO: 将 uri 接入发送流程（上传/引用）。当前仅做回显提示。
+            val name = uri.lastPathSegment ?: uri.toString()
+            Toast.makeText(context, "已选择：$name", Toast.LENGTH_SHORT).show()
+        },
+        onError = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
+    )
 
     fun stopReply() {
         replying?.cancel()
@@ -120,15 +129,6 @@ fun ChatScreen(provider: ChatProvider = remember { DemoProvider() }) {
         stopReply()
         while (messages.isNotEmpty() && !messages.last().fromUser) messages.removeAt(messages.lastIndex)
         if (messages.isNotEmpty()) startReply()
-    }
-
-    fun edit(id: Long) {
-        val idx = messages.indexOfFirst { it.id == id }
-        if (idx < 0) return
-        stopReply()
-        input = messages[idx].text
-        while (messages.size > idx) messages.removeAt(messages.lastIndex)
-        focusTick++
     }
 
     fun setFeedback(id: Long, value: Int) {
@@ -173,7 +173,6 @@ fun ChatScreen(provider: ChatProvider = remember { DemoProvider() }) {
                         messages = messages,
                         streamingId = streamingId,
                         onRegenerate = ::regenerate,
-                        onEdit = ::edit,
                         onFeedback = ::setFeedback,
                     )
                 }
@@ -182,11 +181,30 @@ fun ChatScreen(provider: ChatProvider = remember { DemoProvider() }) {
                 text = input,
                 onTextChange = { input = it },
                 busy = replying != null,
-                focusTick = focusTick,
                 onSend = ::send,
-                onStop = ::stopReply
+                onStop = ::stopReply,
+                onAdd = { showAttachSheet = true },
             )
         }
+    }
+
+    if (showAttachSheet) {
+        AttachmentSheet(
+            onDismiss = { showAttachSheet = false },
+            onAction = { action ->
+                showAttachSheet = false
+                when (action) {
+                    AttachmentAction.Camera -> attachPicker.onPickCamera()
+                    AttachmentAction.Photo -> attachPicker.onPickPhoto()
+                    AttachmentAction.File -> attachPicker.onPickFile()
+                    // 以下为占位项，待实现
+                    AttachmentAction.AddToProject,
+                    AttachmentAction.Permission,
+                    AttachmentAction.Connector,
+                    AttachmentAction.Skills -> Unit
+                }
+            },
+        )
     }
 }
 
@@ -247,7 +265,6 @@ private fun MessageList(
     messages: List<ChatMessage>,
     streamingId: Long?,
     onRegenerate: () -> Unit,
-    onEdit: (Long) -> Unit,
     onFeedback: (Long, Int) -> Unit,
 ) {
     val state = rememberLazyListState()
@@ -284,7 +301,7 @@ private fun MessageList(
                 val animate = remember { seen.add(m.id) }
                 Box(Modifier.enterAnimation(animate)) {
                     if (m.fromUser) {
-                        UserMessage(m.text, onEdit = { onEdit(m.id) })
+                        UserMessage(m.text)
                     } else {
                         AssistantMessage(
                             text = m.text,
@@ -337,15 +354,11 @@ private fun InputBar(
     text: String,
     onTextChange: (String) -> Unit,
     busy: Boolean,
-    focusTick: Int,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onAdd: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(focusTick) {
-        if (focusTick > 0) runCatching { focusRequester.requestFocus() }
-    }
     val canSend = text.isNotBlank()
     val buttonColor by animateColorAsState(
         if (busy || canSend) cs.primary else cs.primary.copy(alpha = .35f),
@@ -375,8 +388,7 @@ private fun InputBar(
                     maxLines = 6,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 6.dp)
-                        .focusRequester(focusRequester),
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
                     decorationBox = { inner ->
                         Box {
                             if (text.isEmpty()) Text(
@@ -391,7 +403,11 @@ private fun InputBar(
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(36.dp).clip(CircleShape).background(cs.surfaceVariant),
+                        Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(cs.surfaceVariant)
+                            .clickable(onClick = onAdd),
                         Alignment.Center
                     ) { PlusIcon(cs.onSurface, 18.dp) }
                     Spacer(Modifier.weight(1f))

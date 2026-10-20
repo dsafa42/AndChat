@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
 
 android {
@@ -19,32 +17,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // 只打包 arm64-v8a
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
-    }
-
-    // 签名信息从环境变量读取（GitHub Actions 里由 Secrets 注入），不写进仓库
-    val ksFile = System.getenv("KEYSTORE_FILE")
-    signingConfigs {
-        if (ksFile != null) {
-            create("release") {
-                storeFile = file(ksFile)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
-            }
-        }
     }
 
     buildTypes {
         release {
-            if (ksFile != null) signingConfig = signingConfigs.getByName("release")
-            // 已关闭 R8 代码压缩/优化（release 版曾闪退）
             optimization {
-                enable = false
+                enable = true
+                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }
@@ -66,10 +45,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
